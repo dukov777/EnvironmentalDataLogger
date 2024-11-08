@@ -8,6 +8,8 @@ https://embedded-systems-design.github.io/overview-of-the-esp32-devkit-doit-v1/
 
 ## Wiring
 
+https://github.com/dukov777/EnvironmentalDataLogger/tree/main/Hardware
+
 ## Prepare Environment for ESP32
 
 Create a file `secrets.h` in the `ESP32-EnvironmentalDataLogger` folder with the following content:
