@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "tim.h": "c",
+        "dma.h": "c",
+        "main.h": "c",
+        "usart.h": "c",
+        "gpio.h": "c",
+        "string.h": "c",
+        "dht22.h": "c"
+    },
+    "cortex-debug.variableUseNaturalFormat": true
+}

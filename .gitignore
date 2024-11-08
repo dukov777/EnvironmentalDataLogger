@@ -63,3 +63,8 @@ Hardware/EnvironmentalDataLogger/EnvironmentalDataLogger.kicad_sch
 Hardware/EnvironmentalDataLogger/EnvironmentalDataLogger-backups/EnvironmentalDataLogger-2024-10-30_102452.zip
 Hardware/EnvironmentalDataLogger/EnvironmentalDataLogger-backups/EnvironmentalDataLogger-2024-10-30_103125.zip
 Hardware/EnvironmentalDataLogger/EnvironmentalDataLogger-backups/EnvironmentalDataLogger-2024-10-30_113327.zip
+
+build/
+STM32-EnvironmentalDataLogger/CMakeCache.txt
+STM32-EnvironmentalDataLogger/compile_commands.json
+STM32-EnvironmentalDataLogger/cmake_install.cmake
