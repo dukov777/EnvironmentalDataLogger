@@ -56,8 +56,9 @@ typedef union{
   struct {
     uint8_t   status;
 		uint16_t  humidity;
-		uint16_t  temperature;
-	}__attribute__((packed));;
+    int16_t temperature;
+  } __attribute__((packed));
+  ;
 }EnvironmentDataReply_t;
 
 EnvironmentDataReply_t dth22_data;

@@ -974,3 +974,4 @@ STM32-EnvironmentalDataLogger/cmake_install.cmake
 .venv/lib/python3.12/site-packages/serial/urlhandler/__pycache__/protocol_rfc2217.cpython-312.pyc
 .venv/lib/python3.12/site-packages/serial/urlhandler/__pycache__/protocol_socket.cpython-312.pyc
 .venv/lib/python3.12/site-packages/serial/urlhandler/__pycache__/protocol_spy.cpython-312.pyc
+ESP32-EnvironmentalDataLogger/secrets.h
