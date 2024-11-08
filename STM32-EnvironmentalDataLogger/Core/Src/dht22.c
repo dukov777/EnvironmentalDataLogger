@@ -3,26 +3,41 @@
 
 #include "dht22.h"
 
+enum STATES
+{
+    STATE_INIT = 0,
+    STATE_START,
+    STATE_RESPONSE1,  //First falling flank
+    STATE_RESPONSE2,  //second falling flank
+    STATE_DATA,
+    STATE_IDLE,
+    STATE_STOP
+};
 
 #define DHT22_TIMINGS_BUFFER_SIZE 40
-uint16_t dht22_captured_timinings[DHT22_TIMINGS_BUFFER_SIZE];
-uint16_t timinings[DHT22_TIMINGS_BUFFER_SIZE];
-
-uint16_t humidity;
-int16_t temperature;
-
 #define DTH22_DATA_SIZE 5
 
-uint8_t bytes[DTH22_DATA_SIZE], checksum;
+#define DHT22_PULL_UP_TIME 50000 // 50us
+#define DHT22_PULL_SENSOR_RESPONCE_TIME 200 // 200us
+#define DHT22_PULL_BIT_SET_TIME 100 // 100us
 
-
+#define DHT22_IS_BIT_SET(time) (time > DHT22_PULL_BIT_SET_TIME)
 
 // The state variable for the interrupt driven state machine
-volatile uint32_t dht22_state = STATE_INIT;
+uint32_t dht22_state = STATE_INIT;
+uint16_t dht22_captured_timinings[DHT22_TIMINGS_BUFFER_SIZE];
+uint16_t humidity;
+int16_t temperature;
+uint8_t bytes[DTH22_DATA_SIZE];
+uint8_t checksum;
+
 
 // Trigger the reading of the DHT22 data, this is a non blocking call
-void DHT22_StartReading()
+void DHT22_Start()
 {
+	DHT22_Stop();
+
+	// Start the timer peripherial
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
 
 	GPIO_InitStruct.Pin = DHT22_Data_Pin;
@@ -34,57 +49,31 @@ void DHT22_StartReading()
 	
 	// Clear counter and start the timer
 	__HAL_TIM_SET_COUNTER(&htim2, 0);
-	// Inite the Timeout time
-	HAL_TIM_Base_Start_IT(&htim2);
 	
-	// Generate 1ms period to wakeup the sensor.
+	// Wakeup the sensor.
     HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_2);
+
+	// Start timeout timer
+    HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_3);
 
 	dht22_state = STATE_START;
 }
 
-// deinitiate the DHT22 peripheral
-void DHT22_Init(){
-	// Initiate the DHT22 peripheral. Start the timer clocks. This is a blocking call
-	MX_TIM2_Init();
-}
+// Stop DHT22 interrupts. This is a blocking call
+void DHT22_Stop(){
+	dht22_state = STATE_STOP;
 
-// deinitiate the DHT22 peripheral
-void DHT22_DeInit(){
-	// Deinitiate the DHT22 peripheral. Stop the timer clocks. This is a blocking call
-	// HAL_TIM_OC_DeInit(&htim2);
-	// HAL_TIM_IC_DeInit(&htim2);
-	HAL_TIM_Base_DeInit(&htim2);
+	HAL_TIM_IC_Stop_DMA(&htim2, TIM_CHANNEL_1);
+	HAL_TIM_OC_Stop_IT(&htim2, TIM_CHANNEL_3);
+	HAL_TIM_OC_Stop_IT(&htim2, TIM_CHANNEL_2);
+	HAL_TIM_IC_Stop_IT(&htim2, TIM_CHANNEL_1);
+	HAL_TIM_Base_Stop_IT(&htim2);
 }
 
 // Handles DHT22 the error state, initiate public dht22 state and reset all peripherals to initialization state.
 
 static void DHT22_Error(DHT22_ErrorCodes_t error) {
-	dht22_state = STATE_IDLE;
-
-	DHT22_DeInit();
-	#warning "DHT22 error deiniit not implemented. interruopts npt disabled!!!"
-
-	// // clear pending interrupts
-	// __HAL_TIM_CLEAR_IT(&htim2, TIM_IT_CC1);
-	// __HAL_TIM_CLEAR_IT(&htim2, TIM_IT_CC2);
-	// __HAL_TIM_CLEAR_IT(&htim2, TIM_IT_UPDATE);
-
-	// HAL_TIM_IC_Stop_IT(&htim2, TIM_CHANNEL_1);
-	// HAL_TIM_OC_Stop_IT(&htim2, TIM_CHANNEL_2);
-
-	// // clear pending DMA interrupts
-	// __HAL_DMA_CLEAR_FLAG(&hdma_tim2_ch1, DMA_FLAG_TC1);
-	// __HAL_DMA_CLEAR_FLAG(&hdma_tim2_ch1, DMA_FLAG_HT1);
-
-	// // diasble the DMA channel
-	// HAL_TIM_IC_Stop_DMA(&htim2, TIM_CHANNEL_1);
-
-	// Set the pin to input. Let the pull up resistor pull the line high.
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
-	GPIO_InitStruct.Pin = DHT22_Data_Pin;
-	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-	HAL_GPIO_Init(DHT22_Data_GPIO_Port, &GPIO_InitStruct);
+	DHT22_Stop();
 
 	// Tell the listener that an error has occured
 	DHT22_ErrorCallback(error);
@@ -124,18 +113,12 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim) {
 			// Initiate waiting for falling edge on DHT22_Data_Pin
 			// DHT22_Data_Pin is CH1 default capture compare pin
 			HAL_TIM_IC_Start_IT(htim, TIM_CHANNEL_1);
-
-			return;
+		} else if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3) {
+			HAL_TIM_OC_Stop_IT(htim, TIM_CHANNEL_3);
+			DHT22_TimeoutError();
 		}
 	}
 }
-
-// ISR handler for the DHT22 data pin called on falling edge and DMA transfer complete
-#define DHT22_PULL_UP_TIME 50 // 50us
-#define DHT22_PULL_SENSOR_RESPONCE_TIME 200 // 200us
-#define DHT22_PULL_BIT_SET_TIME 100 // 100us
-
-#define DHT22_IS_BIT_SET(time) (time > DHT22_PULL_BIT_SET_TIME)
 
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
@@ -146,21 +129,23 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 				if(ellapsed_time < DHT22_PULL_UP_TIME){
 					dht22_state = STATE_RESPONSE2;
 					__HAL_TIM_SET_COUNTER(htim, 0);
-					HAL_TIM_IC_Start_IT(htim, TIM_CHANNEL_1);
 				}else{
 					DHT22_FramingError();
 				}
 			} else if(dht22_state == STATE_RESPONSE2){
+				HAL_TIM_IC_Stop_IT(htim, TIM_CHANNEL_1);
 				uint16_t ellapsed_time = __HAL_TIM_GET_COUNTER(htim);
 				if(ellapsed_time < DHT22_PULL_SENSOR_RESPONCE_TIME){
 					dht22_state = STATE_DATA;
 
+					//clear CNT to avoid overflow during the data capture
 					__HAL_TIM_SET_COUNTER(htim, 0);
 					HAL_TIM_IC_Start_DMA(&htim2, TIM_CHANNEL_1, (uint32_t*)dht22_captured_timinings, DHT22_TIMINGS_BUFFER_SIZE);
 				}else{
 					DHT22_FramingError();
 				}
 			} else if(dht22_state == STATE_DATA) {
+				HAL_TIM_IC_Stop_DMA(&htim2, TIM_CHANNEL_1);
 				// convert the captured dht22 time series into Rh and Temp
 				bytes[0] = DHT22_IS_BIT_SET(dht22_captured_timinings[0]) ? 1:0;
 				for(int i = 1; i < DTH22_DATA_SIZE * 8; i++){
@@ -176,7 +161,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 					dht22_state = STATE_IDLE;
 
 					//convert the data without the sign bit
-					temperature = ((uint16_t)bytes[2] & 0x7F) | bytes[3];
+					temperature = (((uint16_t)bytes[2] & 0x7F)<<8) | bytes[3];
 					
 					// add the sign
 					if (bytes[2] & 0x80) {
@@ -185,6 +170,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 
 					humidity = ((int16_t)bytes[0] << 8) | bytes[1];
 
+					DHT22_Stop();
 					// Notify the listener that the data is ready
 					DHT22_DataReadyCallback(humidity, temperature);
 				}else{
@@ -198,26 +184,13 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
 	}
 }
 
-volatile uint16_t tim3_ellapsed_time = 0;
-// ISR handler called when no sensor data has been received within the timeout period
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-
-	if(htim == &htim2){
-	}
-	if(htim->Instance == TIM2){
-		// DHT22_TimeoutError();
-		#ifdef DEBUG
-		HAL_GPIO_TogglePin(PINA1_GPIO_Port, PINA1_Pin);
-		#endif
-	}
-
-}
-
 
 __weak void DHT22_ErrorCallback(DHT22_ErrorCodes_t error){
 	UNUSED(error);
 
 }
+
+
 __weak void DHT22_DataReadyCallback(uint16_t humidity, int16_t temperature){
 	UNUSED(humidity);
 	UNUSED(temperature);
