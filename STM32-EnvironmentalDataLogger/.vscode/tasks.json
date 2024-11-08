@@ -29,7 +29,7 @@
             "type": "shell",
             "command": "cmake",
             "args": [
-                "--build", "${workspaceFolder}/build"
+                "--build", "${workspaceFolder}/build", "-j8"
             ],
             "group": "build",
             "problemMatcher": [],

@@ -7,5 +7,6 @@
         "gpio.h": "c",
         "string.h": "c",
         "dht22.h": "c"
-    }
+    },
+    "cortex-debug.variableUseNaturalFormat": true
 }
