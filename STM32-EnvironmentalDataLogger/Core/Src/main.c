@@ -53,11 +53,11 @@
 typedef union{
 	uint8_t buffer[ENVIRONMENT_DATA_REPLY_SIZE];
 	// packet structure
-  __packed struct {
+  struct {
     uint8_t   status;
 		uint16_t  humidity;
 		uint16_t  temperature;
-	};
+	}__attribute__((packed));;
 }EnvironmentDataReply_t;
 
 EnvironmentDataReply_t dth22_data;
@@ -83,38 +83,37 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart){
     if(huart->Instance == USART1){
-        // Start the uart to listen to.  
+        // Start listening on uart1.  
         HAL_UART_Receive_IT(&huart1, receive_buffer, 1);
     }
 }
 
-void DHT22_ErrorCallback(DHT22_ErrorCodes_t error){
-    // let the caller know that an error has occurred
-    dth22_data.status = error;
+void DHT22_DataReadyCallback(uint16_t humidity, int16_t temperature){
+    dth22_data.status = DHT22_ERROR_NO_ERROR;
+    dth22_data.humidity = humidity;
+    dth22_data.temperature = temperature;
 
-    HAL_StatusTypeDef hal_status = HAL_UART_Transmit_DMA(&huart1, "ERROR\r\n", 7);
     // transmit received humidity and temperature in little endian order.
-//    HAL_StatusTypeDef hal_status = HAL_UART_Transmit_DMA(&huart2, dth22_data.buffer, ENVIRONMENT_DATA_REPLY_SIZE);
+    HAL_StatusTypeDef hal_status = HAL_UART_Transmit_DMA(&huart1, dth22_data.buffer, ENVIRONMENT_DATA_REPLY_SIZE);
     if(hal_status != HAL_OK){
         // Unexpected UART State. It has to be free for transmission.
         Error_Handler();
     }
 }
 
-void DHT22_DataReadyCallback(uint16_t humidity, int16_t temperature){
-    // cleanup the DHT22 peripheral resource and clocks    
-    dth22_data.status = DHT22_ERROR_NO_ERROR;
-    dth22_data.humidity = humidity;
-    dth22_data.temperature = temperature;
-    char humidity_str[10];
-    itoa(humidity, humidity_str, 10);
-    HAL_UART_Transmit_DMA(&huart1, humidity_str, strlen(humidity_str));
+
+void DHT22_ErrorCallback(DHT22_ErrorCodes_t error){
+    // let the caller know that an error has occurred
+    dth22_data.status = error;
+
+    // HAL_StatusTypeDef hal_status = HAL_UART_Transmit_DMA(&huart1, "ERROR\r\n", 7);
+    
     // transmit received humidity and temperature in little endian order.
-//    HAL_StatusTypeDef hal_status = HAL_UART_Transmit_DMA(&huart2, dth22_data.buffer, ENVIRONMENT_DATA_REPLY_SIZE);
-    // if(hal_status != HAL_OK){
-    //     // Unexpected UART State. It has to be free for transmission.
-    //     Error_Handler();
-    // }
+    HAL_StatusTypeDef hal_status = HAL_UART_Transmit_DMA(&huart1, dth22_data.buffer, ENVIRONMENT_DATA_REPLY_SIZE);
+    if(hal_status != HAL_OK){
+        // Unexpected UART State. It has to be free for transmission.
+        Error_Handler();
+    }
 }
 
 /* USER CODE END 0 */
@@ -160,28 +159,25 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  // Start the uart to listen to.  
-  HAL_UART_Receive_IT(&huart1, receive_buffer, 1);
+	// Start the uart to listen to.
+	HAL_UART_Receive_IT(&huart1, receive_buffer, 1);
 
-  // // test call remove it!
-  // DHT22_StartReading();
 
-	// HAL_SuspendTick();
-  // HAL_PWR_EnableSleepOnExit ();
-  // //	  Enter Sleep Mode , wake up is done once User push-button is pressed
-	// HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
-  // We should not reach this point!
-  // Error_Handler();
-  while (1)
-  {
-    /* USER CODE END WHILE */
+	HAL_SuspendTick();
+	HAL_PWR_EnableSleepOnExit ();
+	//	  Enter Sleep Mode , wake up is done once User push-button is pressed
+	HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+	// We should not reach this point!
+	// Error_Handler();
+	while (1)
+	{
+  /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
-
-//	HAL_SuspendTick();
-	HAL_PWR_EnterSLEEPMode(PWR_LOWPOWERREGULATOR_ON, PWR_SLEEPENTRY_WFI);
-//	HAL_ResumeTick();
-  }
+  /* USER CODE BEGIN 3 */
+		HAL_SuspendTick();
+		HAL_PWR_EnterSLEEPMode(PWR_LOWPOWERREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+		HAL_ResumeTick();
+	}
   /* USER CODE END 3 */
 }
 
