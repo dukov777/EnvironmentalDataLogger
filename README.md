@@ -7,6 +7,34 @@
 2. No HAL API error handling
 3. Consistent formatting and naming conventions across STM32 and ESP projects :(
 
+# Design
+The selected approach for communication and measurement is the request->measure->reply. By doing this, ESP32 triggers the measurement and waits until the measured data is returned or timeouts. 
+To reduce the power used, I decided to minimize resources and time executions, so the STM32 code is designed in SLEEPONEXIT mode, where only the interrupts are called on activity on certain peripherals.
+Particularly, once the STM32 receives the UART RX interrupt, it initiates the DHT wakeup process by starting TIM2 in CO mode for 5000 uS. On the TIM CO interrupt, we pull up the data pin and start the TIM2 CI to capture the input change. Once the DHT sync has been received, the TIM CI is started again to receive the remaining data bit stream.
+Completing the data receiving, we convert bitstream to data and initiate UART TX in DMA mode.
+In cases of DHT bitstream error, we send the Error information to ESP32 and cut the execution, thus preserving the power.
+
+# Implementation
+
+The STM32 to ESP32 data format is little-endian packed in 5 bytes. This is the simplest format, but it could cause issues if the compiler has issues with packing. This structure has been copy-pasted in ESP32 and STM32, which is bad practice since changing one place does not guarantee we did all over the rest.
+
+``` C
+typedef union{
+	uint8_t buffer[ENVIRONMENT_DATA_REPLY_SIZE];
+	// packet structure
+  struct {
+    uint8_t   status;
+		uint16_t  humidity;
+    int16_t temperature;
+  } __attribute__((packed));
+  ;
+}EnvironmentDataReply_t;
+```
+
+STM32 configuration has been done with STM32CubeMX, and some of the timers initialize values are "hidden". This makes it hard to understand why some decisions are made by reading code only.
+
+ESP32 reading from STM32 and writing to ThingSpeak is straightforward without any power management.
+
 
 # Project
 https://github.com/users/dukov777/projects/4
