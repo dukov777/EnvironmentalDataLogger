@@ -1,15 +1,23 @@
+# Status
+:white_check_mark: Done
+1. The project has been tested with DHT11 -> Nucleo F103 -> ESP32 Devkit->ThingSpeak
 
-## Project
+:negative_squared_cross_mark:	 Not Done
+1. No defensive programming
+2. No HAL API error handling
+3. Consistent formatting and naming conventions across STM32 and ESP projects :(
+
+
+# Project
 https://github.com/users/dukov777/projects/4
 
-## Resources
-https://embedded-systems-design.github.io/overview-of-the-esp32-devkit-doit-v1/
 
-## Wiring
+# Wiring
 
 https://github.com/dukov777/EnvironmentalDataLogger/blob/main/Docs/Schematics.pdf
 https://github.com/dukov777/EnvironmentalDataLogger/tree/main/Hardware
 
+# Setup
 ## Prepare Environment for ESP32
 
 Create a file `secrets.h` in the `ESP32-EnvironmentalDataLogger` folder with the following content:
@@ -25,7 +33,7 @@ Create a file `secrets.h` in the `ESP32-EnvironmentalDataLogger` folder with the
 #define SECRET_WRITE_APIKEY "XYZ"   // replace XYZ with your channel write API Key
 ```
 
-## Tests
+# Tests
 ### 1. Install python and dependencies
 
 ```bash
@@ -34,7 +42,7 @@ source .venv/bin/activate  # On macOS/Linux
 pip install -r requirements.txt
 ```
 
-### 2. Run the test
+### 2. Test STM32 communication channel
 
 Read DHT22 data from STM32F103
 ```bash
@@ -48,10 +56,6 @@ Status:  OK
 Humidity:  36
 Temperature:  23
 ```
-# Done
-1. The project has been tested with DHT11 -> Nucleo F103 -> ESP32 Devkit->ThingSpeak
 
-# Not Done
-1. No "defensive programming"
-2. No HAL API error handling
-3. Formating and naming could be more sustainable :(
+# Resources
+https://embedded-systems-design.github.io/overview-of-the-esp32-devkit-doit-v1/
